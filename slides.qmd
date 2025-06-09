@@ -1,0 +1,396 @@
+---
+title: "Text Classification"
+subtitle: "in the Age of LLMs"
+author: "Michal Ovádek"
+institute: "UCL"
+format:
+  revealjs:
+    theme: default
+    incremental: true
+    embed-resources: true
+    footer: "Text Classification"
+    slide-number: c/t
+    show-slide-number: all
+    center: true
+    margin-left: "0.1"
+    margin-right: "0.1"
+---
+
+```{r}
+library(tidyverse)
+```
+
+## Outline
+
+- what is text classification?
+
+- classification models
+
+- evaluation
+
+- LLM prompting
+
+- Q&A
+
+## Text classification
+
+- the process of assigning labels (categories) to textual sequences of arbitrary length
+
+- something we do implicitly all the time in human interactions
+
+- ubiquitous in research and practice
+
+## Text classification
+
+> 18. The decision of the judge involved a material error of law. We set aside the decision and do not preserve any findings of fact. The matter is to be remitted to the First-tier Tribunal to be decided de novo by a judge other than the judge who heard the appeal in December 2024.
+
+Was the first-instance decision set aside? **Yes**
+
+Was the appeal successful? **Yes**
+
+## Text classification
+
+- traditionally done manually by humans (especially experts)
+
+- but can also be done by machines
+
+- the extent to which classification depends on human direction is often referred to as "supervision"
+
+## Text classification
+
+- "unsupervised" text classification
+
+  - an algorithm decides optimal classification with minimal instruction from operator
+
+  - e.g. most topic modelling algorithms
+
+## Text classification
+
+- "semi-supervised" text classification
+
+  - algorithm decides classification but incorporating operator's prior information
+
+  - e.g. seeded LDA
+
+## Text classification
+
+- "supervised" text classification
+
+  - operator trains an algorithm to automate pre-existing classification
+  
+  - most text classification models
+
+## Text classification in the social sciences
+
+- often an intermediate step in the research pipeline
+
+  - classification is about trying to measure things
+
+- classification output is frequently used for subsequent analysis which can be more or less driven by theory (exploratory vs hypothesis-testing)
+
+## Text classification models
+
+```{dot}
+digraph G {
+  rankdir = LR;
+  layout = dot;
+  overlap = false;
+  node [shape=box]; model;
+  node [shape=circle]; input; output;
+  input->model;
+  model->output;
+}
+```
+
+## Text classification models
+
+```{dot}
+digraph G {
+  rankdir = LR;
+  layout = dot;
+  overlap = false;
+  node [shape=box]; classifier;
+  node [shape=circle]; text; label;
+  text->classifier;
+  classifier->label;
+}
+```
+
+## Classification output
+
+::: {.callout-note}
+A classification model outputs a label, i.e. a **categorical variable**. We are not going concern ourselves with models outputting numerical values, even if the categories can be ordered.
+
+We are also going to restrict ourselves to the scenario when:
+
+$$
+\sum_i^N Pr(class_i) = 1
+$$
+
+where $class_i$ comes from a closed set of possible categories (the values of the categorical variable).
+:::
+
+## Text representation
+
+- before we can classify any text we need to convert it into numbers
+
+  - **feature counts**: represent texts as word counts
+  - **global embeddings**: represent texts as static embeddings
+  - **contextual embeddings**: represent texts as dynamic embeddings
+
+## Bags of words {.smaller}
+
+1.  Time flies like an arrow.
+2.  Fruit flies like a banana.
+
+. . .
+
+|            | time | flies | fruit | like | an  |  a  | banana | arrow |
+|:-----------|:----:|:-----:|:-----:|:----:|:---:|:---:|:------:|:-----:|
+| Sentence 1 |  1   |   1   |   0   |  1   |  1  |  0  |   0    |   1   |
+| Sentence 2 |  0   |   1   |   1   |  1   |  0  |  1  |   1    |   0   |
+
+::: incremental
+-   The dependency structure between words in each sentence is lost
+-   The word "flies" has two different meanings (metaphorical versus literal)
+-   The word "like" has two different meanings (preposition versus verb)
+:::
+
+## Word embeddings {.smaller}
+
+Leveraging words around words -- the context -- we can compress information about the meaning of words into dense, real-valued vectors.
+
+:::{.columns}
+
+::: {.column width="40%"}
+
+\begin{align}
+  w_{\text{debt}} &= \begin{bmatrix}
+         0.73  \\
+         0.04 \\
+         0.07 \\
+         -0.18 \\
+         0.81 \\
+         -0.97
+       \end{bmatrix}
+\end{align}
+
+:::
+
+::: {.column width="40%"}
+
+\begin{align}
+  w_{\text{deficit}} &= \begin{bmatrix}
+         0.63 \\
+         .14 \\
+         .02 \\
+         -0.58 \\
+         0.43 \\
+         -0.66
+       \end{bmatrix}
+\end{align}
+
+:::
+
+:::
+
+These representations are known as **word embeddings** because we "embed" words into a low-dimensional space (*low* compared to the vocabulary size).
+
+## Contextualized embeddings
+
+Word embeddings are richer representations of texts but in their static form they don't fully address the issues of polysemy and positionality. Static embeddings give us average representations, but we would ideally want more specific embeddings.
+
+. . .
+
+This was solved by the attention mechanism which let's words and their embeddings interact in complex ways to capture meaning **in context**. This is at the root of what makes modern LLM's "understanding" of language so human-like.
+
+## The train-test paradigm
+
+1.  label a (random) subset of your data
+2.  train a model on the training data
+3.  evaluate performance on a withheld sample (validation/test data)
+4.  use model to run inference (label) the remaining data
+
+## The train-test paradigm {.smaller}
+
+Historically, the classification would be built from scratch, without the model having any prior information about language or the data.
+
+. . .
+
+The rise of **transfer-learning** changed that -- we can now fine-tune language models for classification to leverage their existing knowledge of language.
+
+The more the model already knows, the fewer examples it needs to see to do well (many-shot, few-shot, zero-shot).
+
+## Generating training data
+
+-   traditionally relies on manually labelling texts based on theoretical interest
+
+-   ideally we have multiple coders and can establish inter-coder reliability
+
+-   LLMs are being increasingly used to generate labelled dataset instead of human coders
+
+## Generating training data
+
+```{r, echo=FALSE}
+tibble(
+  id = c("id-1", "id-2"),
+  text = c("This class is fun", "This class is boring"),
+  y = c(TRUE, FALSE)
+) |> knitr::kable()
+```
+
+## Training data
+
+![](train_data.png)
+
+## Comparing models
+
+![](models_comparison.png)
+
+## Performance metrics {.smaller}
+
+::: incremental
+-   How can we assess the classification performance of our text classifier?
+
+-   Our goal is to measure the degree to which the <a text-color="purple">predictions</a> we make correspond to the <a text-color="orange">observed data</a>
+
+-   In order to get informative estimates of these quantities, we need to distinguish between the performance of the classifier on the training set and the test set
+:::
+
+## Performance metrics {.smaller}
+
+::: {.fragment fragment-index="3"}
+$$\text{Accuracy} = \frac{\#\text{True Positives} + \#\text{True Negatives}}{\# \text{Observations} }$$
+
+$$\text{Sensitivity} = \frac{\#\text{True Positives}}{\# \text{True Positives}  + \# \text{False Negatives} }$$ $$\text{Specificity} = \frac{\#\text{True Negatives}}{\# \text{True Negative}  + \# \text{False Positives} }$$
+:::
+
+-   Accuracy -- the proportion of all predictions that match the observed data
+-   Sensitivity -- the proportion of "true positive" predictions that match the observed data
+-   Specificity -- the proportion of "true negative" predictions that match the observed data
+
+## Training versus test error
+
+::: incremental
+-   The <a style="color: #EAC79D;">test error</a> is the average error that results from using a statistical learning method to predict the response on a new observation, one that was not used in training the method.
+
+-   In contrast, the <a style="color: #AFD0D7;">training error</a> can be easily calculated by applying the statistical learning method to the observations used in its training.
+
+-   Training error rate often is quite different from the test error rate, and in particular the former can <a style="color: red;">dramatically underestimate</a> the latter.
+:::
+
+# Text classification with LLMs
+
+## LLMs {.smaller}
+
+LLMs make potentially complex text classification easier than ever before.
+
+- they can be controlled with natural language instructions
+
+- they have unparalleled understanding of language (due to size)
+
+- they don't need many examples
+
+- you don't need to preprocess texts
+
+- you don't need expensive hardware to use them
+
+## LLM prompts
+
+- prompt engineering is critical to getting good classification performance from LLMs
+
+- what works and what doesn't is evolving with the LLMs
+
+## Prompting tips
+
+- use both system and user prompts
+
+- your instructions must be unambiguous and crystal clear
+
+- use your domain expertise
+
+- experiment with the order of task descriptions and examples
+
+## Prompting tips
+
+- experiment with assigning roles to the LLM
+
+- chain of thought / reasoning usually improves performance in difficult cases
+
+- use delimiters like `<>` to denote categories
+
+## LLM tips
+
+When it comes to performance:
+
+- larger models > smaller models
+
+- proprietary models > open source models
+
+. . .
+
+Set `temperature` to $0$ for more replicability.
+
+## API calls {.smaller}
+
+We can interact with major LLM providers at scale using API calls:
+
+```{r, eval=FALSE, echo=TRUE}
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=GEMINI_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -X POST \
+  -d '{
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "Explain how AI works in a few words"
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+## API calls
+
+- LLMs typically respond in the JSON format which needs to be parsed
+
+- trivial to implement in any programming language
+
+## LLM tips
+
+In order to limit the number of documents which need classification, we want to frequently pre-select documents which are likely to be relevant. We can do this with keywords or a bespoke, smaller model.
+
+## LLM tips
+
+```{dot}
+digraph G {
+  rankdir = LR;
+  layout = dot;
+  overlap = false;
+  node [shape=box]; classifier; selector;
+  node [shape=circle]; text; label;
+  text->selector;
+  selector->classifier;
+  classifier->label;
+}
+```
+
+## Measurement error {.smaller}
+
+Finally, note that there will inevitably be some degree of measurement error at the end of this process. Both the selection and classification models will not be 100% accurate.
+
+When you analyse your labelled data at the end, you should account for this error:
+
+- Gligorić, Kristina, et al. "Can Unconfident LLM Annotations Be Used for Confident Conclusions?." arXiv preprint arXiv:2408.15204 (2024).
+
+- Egami, Naoki, et al. "Using imperfect surrogates for downstream inference: Design-based supervised learning for social science applications of large language models." Advances in Neural Information Processing Systems 36 (2023): 68589-68601.
+
+## Exercise
+
+We will try to replicate the labels for a sample of UK Upper Tribunal decisions. The data file `uk_sample.parquet` contains paragraphs with manually coded case outcomes indicating whether the appellant succeeded, failed or neither in an appeal against a first-instance decision.
+
+## Exercise {.smaller}
+
+> 12. I find that the judge made adequate findings to support her conclusion that the Appellant and Sponsor's marriage was one of convenience. She set out her reasons and they are clear. It is important to note that it had not been disputed that the Appellant is in a genuine and subsisting relationship with the mother of his children, Mavis, with whom he lives, and who has no immigration status in the United Kingdom. I find that there is no error of law in the consideration of the issue of the marriage of convenience.

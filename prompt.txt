@@ -1,0 +1,14 @@
+Task description:
+
+Your task is to classify the text of judicial decisions. The paragraphs which you will see were written by the Upper Tribunal Immigration and Asylum Chamber in the United Kingdom. For each paragraph you have to decide whether the applicants before the Upper Tribunal were successful or not. Reply only with <success>, <failure> or <neither>. I will first show you an example and then it will be your turn.
+
+Example text:
+
+I find that the judge made adequate findings to support her conclusion that the Appellant and Sponsor's marriage was one of convenience. She set out her reasons and they are clear. It is important to note that it had not been disputed that the Appellant is in a genuine and subsisting relationship with the mother of his children, Mavis, with whom he lives, and who has no immigration status in the United Kingdom. I find that there is no error of law in the consideration of the issue of the marriage of convenience.
+
+Example answer:
+
+<failure>
+
+Text:
+
